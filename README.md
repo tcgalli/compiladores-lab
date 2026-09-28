@@ -141,3 +141,74 @@ para ninguém perder tempo pelo caminho errado.
    `evidencias/verificacao-N.txt`.
 4. Cada integrante recebe uma cópia por e-mail. **Guardem esse e-mail**: é o
    comprovante.
+
+## Tabela de tokens da Entrega 1
+
+A análise léxica reconhece os seguintes grupos de token, em ordem de prioridade (operadores compostos antes dos simples):
+
+| Categoria | Tokens | Reconhecimento |
+|---|---|---|
+| Palavras reservadas | `funcao`, `retorne`, `se`, `senao`, `enquanto`, `escreva`, `inteiro`, `real`, `logico`, `texto`, `vazio`, `verdadeiro`, `falso`, `e`, `ou`, `nao` | identificadores exatos do MPL |
+| Identificador | `ID` | `[A-Za-z_][A-Za-z0-9_]*` |
+| Literal inteiro | `INTEIRO` | `[0-9]+` |
+| Literal real | `REAL` | `[0-9]+\.[0-9]+` (obrigatório dos dois lados) |
+| Literal lógico | `LOGICO` | `verdadeiro` ou `falso` |
+| Literal texto | `TEXTO` | `"(\\[nt\"\\]|[^\"\\\r\n])*"` |
+| Comentários | `// ...` e `/* ... */` | ignorados, exceto erro se o bloco não fechar |
+| Operadores compostos | `==`, `!=`, `<=`, `>=` | lidos antes dos simples |
+| Operadores simples | `+`, `-`, `*`, `/`, `%`, `<`, `>`, `=` | mapeados para `MAIS`, `MENOS`, `VEZES`, `DIVIDE`, `RESTO`, `MENOR`, `MAIOR`, `ATRIBUI` |
+| Delimitadores | `(`, `)`, `{`, `}`, `,`, `;` | `ABRE_PAR`, `FECHA_PAR`, `ABRE_CHAVE`, `FECHA_CHAVE`, `VIRGULA`, `PONTO_VIRGULA` |
+| Espaços | ignorados | espaço, tabulação, `\r`, `\n` |
+
+Regras importantes da implementação:
+
+- `<=` e `>=` são testados antes de `<` e `>`.
+- `==` e `!=` são testados antes de `=` e `!`.
+- qualquer escape fora de `\n`, `\t`, `\"` e `\\` é erro léxico.
+- `3.` e `.5` são erro léxico.
+- `/* ... */` não aninha; o primeiro `*/` fecha e um bloco sem fechamento dispara erro na linha/coluna de abertura.
+- o último token é sempre `FIM_ARQUIVO`, na linha seguinte ao fim do arquivo (ou na coluna 1 depois do último caractere, se não houver quebra de linha).
+
+## Gramática implementada da Entrega 2
+
+A gramática usada no parser recursivo descendente da Entrega 2 é a seguinte, em EBNF:
+
+```ebnf
+programa        ::= { funcao }
+funcao          ::= "funcao" tipo ID "(" [ parametros ] ")" bloco
+parametros      ::= parametro { "," parametro }
+parametro       ::= tipo ID
+bloco           ::= "{" { comando } "}"
+comando         ::= declaracao
+                 | atribuicao
+                 | condicional
+                 | repeticao
+                 | escrita
+                 | retorno
+                 | chamada ";"
+
+declaracao      ::= tipo ID [ "=" expressao ] ";"
+atribuicao      ::= ID "=" expressao ";"
+condicional     ::= "se" "(" expressao ")" bloco [ "senao" bloco ]
+repeticao       ::= "enquanto" "(" expressao ")" bloco
+escrita         ::= "escreva" "(" expressao ")" ";"
+retorno         ::= "retorne" [ expressao ] ";"
+chamada         ::= ID "(" [ expressao { "," expressao } ] ")"
+
+tipo            ::= "inteiro" | "real" | "logico" | "texto" | "vazio"
+expressao       ::= ou
+ou              ::= e { "ou" e }
+e               ::= igualdade { "e" igualdade }
+igualdade       ::= relacional { ( "==" | "!=" ) relacional }
+relacional       ::= soma { ( "<" | "<=" | ">" | ">=" ) soma }
+soma            ::= produto { ( "+" | "-" ) produto }
+produto         ::= unario { ( "*" | "/" | "%" ) unario }
+unario          ::= [ "nao" | "-" ] unario
+                 | primario
+primario        ::= literal
+                 | ID [ "(" [ expressao { "," expressao } ] ")" ]
+                 | "(" expressao ")"
+literal         ::= INTEIRO | REAL | LOGICO | TEXTO
+```
+
+A precedência está codificada por camadas recursivas na própria gramática: `ou` chama `e`, `e` chama `igualdade`, e assim por diante até `primario`. Cada nível resolve primeiro os operadores mais fortes e empilha os mais fracos acima deles, de modo que a árvore sintática sempre coloca o operador de menor precedência na raiz e os de maior precedência abaixo, como em `1 + 2 * 3` sendo `binario +` com filho `binario *`.
