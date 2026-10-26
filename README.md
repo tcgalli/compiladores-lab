@@ -212,3 +212,23 @@ literal         ::= INTEIRO | REAL | LOGICO | TEXTO
 ```
 
 A precedência está codificada por camadas recursivas na própria gramática: `ou` chama `e`, `e` chama `igualdade`, e assim por diante até `primario`. Cada nível resolve primeiro os operadores mais fortes e empilha os mais fracos acima deles, de modo que a árvore sintática sempre coloca o operador de menor precedência na raiz e os de maior precedência abaixo, como em `1 + 2 * 3` sendo `binario +` com filho `binario *`.
+
+## Estrutura de escopos da Entrega 3
+
+Cada escopo guarda seus símbolos na ordem em que foram declarados e aponta para o escopo que o contém:
+
+| Estrutura | Representação |
+|---|---|
+| Tabela de escopos | Lista numerada na ordem em que os escopos são abertos |
+| Escopo | Número, descrição, referência ao pai e lista ordenada de símbolos |
+| Símbolo | Nome, categoria, tipo e linha da declaração |
+
+Para encontrar um nome, a busca começa no escopo atual e segue pelos pais. Assim, uma declaração local pode sombrear uma declaração externa sem apagá-la; ao sair do bloco, a busca volta a encontrar a declaração externa.
+
+A abertura dos escopos segue estas regras:
+
+- O escopo global contém as assinaturas das funções.
+- Cada função abre um escopo para os parâmetros e outro para o bloco do corpo.
+- Cada bloco, incluindo os de `se`, `senao` e `enquanto`, abre um novo escopo.
+
+Essa organização produz a numeração e a relação entre escopos usadas em `--tabela`, e mantém a informação de pai necessária para relacionar nomes a posições de memória na E4.

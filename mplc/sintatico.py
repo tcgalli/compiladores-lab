@@ -85,14 +85,15 @@ class Parser:
         return No('programa', funcoes)
 
     def parse_funcao(self):
-        self.consumir('FUNCAO')
+        inicio = self.consumir('FUNCAO')
         tipo = self.parse_tipo()
         nome = self.consumir('ID').lexema
         self.consumir('ABRE_PAR')
         parametros = self.parse_parametros()
         self.consumir('FECHA_PAR')
         bloco = self.parse_bloco()
-        return No(f'funcao {nome} {tipo}', [parametros, bloco])
+        return No(f'funcao {nome} {tipo}', [parametros, bloco],
+                  inicio.linha, inicio.coluna)
 
     def parse_parametros(self):
         parametros = []
@@ -100,23 +101,25 @@ class Parser:
             return No('parametros', parametros)
 
         while True:
+            inicio = self.atual()
             tipo = self.parse_tipo()
             nome = self.consumir('ID').lexema
-            parametros.append(No(f'parametro {nome} {tipo}'))
+            parametros.append(No(f'parametro {nome} {tipo}',
+                                 linha=inicio.linha, coluna=inicio.coluna))
             if self.atual().tipo != 'VIRGULA':
                 break
             self.consumir('VIRGULA')
         return No('parametros', parametros)
 
     def parse_bloco(self):
-        self.consumir('ABRE_CHAVE')
+        inicio = self.consumir('ABRE_CHAVE')
         comandos = []
         while self.atual().tipo != 'FECHA_CHAVE':
             if self.atual().tipo == 'FIM_ARQUIVO':
                 self.erro('bloco nao fechado', self.atual())
             comandos.append(self.parse_comando())
         self.consumir('FECHA_CHAVE')
-        return No('bloco', comandos)
+        return No('bloco', comandos, inicio.linha, inicio.coluna)
 
     def parse_comando(self):
         tok = self.atual()
@@ -152,9 +155,11 @@ class Parser:
         return TIPOS[tok.tipo]
 
     def parse_declaracao(self):
+        inicio = self.atual()
         tipo = self.parse_tipo()
         nome = self.consumir('ID').lexema
-        no = No(f'declaracao {nome} {tipo}')
+        no = No(f'declaracao {nome} {tipo}', linha=inicio.linha,
+                coluna=inicio.coluna)
         if self.atual().tipo == 'ATRIBUI':
             self.consumir('ATRIBUI')
             no.filhos.append(self.parse_ou())
@@ -162,14 +167,15 @@ class Parser:
         return no
 
     def parse_atribuicao(self):
-        nome = self.consumir('ID').lexema
+        inicio = self.consumir('ID')
+        nome = inicio.lexema
         self.consumir('ATRIBUI')
         expr = self.parse_ou()
         self.consumir('PONTO_VIRGULA')
-        return No(f'atribuicao {nome}', [expr])
+        return No(f'atribuicao {nome}', [expr], inicio.linha, inicio.coluna)
 
     def parse_se(self):
-        self.consumir('SE')
+        inicio = self.consumir('SE')
         self.consumir('ABRE_PAR')
         cond = self.parse_ou()
         self.consumir('FECHA_PAR')
@@ -177,39 +183,40 @@ class Parser:
         if self.atual().tipo == 'SENAO':
             self.consumir('SENAO')
             senao = self.parse_bloco()
-            return No('se', [cond, entao, senao])
-        return No('se', [cond, entao])
+            return No('se', [cond, entao, senao], inicio.linha, inicio.coluna)
+        return No('se', [cond, entao], inicio.linha, inicio.coluna)
 
     def parse_enquanto(self):
-        self.consumir('ENQUANTO')
+        inicio = self.consumir('ENQUANTO')
         self.consumir('ABRE_PAR')
         cond = self.parse_ou()
         self.consumir('FECHA_PAR')
         bloco = self.parse_bloco()
-        return No('enquanto', [cond, bloco])
+        return No('enquanto', [cond, bloco], inicio.linha, inicio.coluna)
 
     def parse_escreva(self):
-        self.consumir('ESCREVA')
+        inicio = self.consumir('ESCREVA')
         self.consumir('ABRE_PAR')
         expr = self.parse_ou()
         self.consumir('FECHA_PAR')
         self.consumir('PONTO_VIRGULA')
-        return No('escreva', [expr])
+        return No('escreva', [expr], inicio.linha, inicio.coluna)
 
     def parse_retorne(self):
-        self.consumir('RETORNE')
+        inicio = self.consumir('RETORNE')
         if self.atual().tipo == 'PONTO_VIRGULA':
             self.consumir('PONTO_VIRGULA')
-            return No('retorne')
+            return No('retorne', linha=inicio.linha, coluna=inicio.coluna)
         expr = self.parse_ou()
         self.consumir('PONTO_VIRGULA')
-        return No('retorne', [expr])
+        return No('retorne', [expr], inicio.linha, inicio.coluna)
 
     def parse_chamada_comando(self):
-        nome = self.consumir('ID').lexema
+        inicio = self.consumir('ID')
+        nome = inicio.lexema
         args = self.parse_argumentos()
         self.consumir('PONTO_VIRGULA')
-        return No(f'chamada {nome}', args)
+        return No(f'chamada {nome}', args, inicio.linha, inicio.coluna)
 
     def parse_argumentos(self):
         self.consumir('ABRE_PAR')
@@ -226,56 +233,64 @@ class Parser:
     def parse_ou(self):
         expr = self.parse_e()
         while self.atual().tipo == 'OU':
-            self.consumir('OU')
-            expr = No('binario ou', [expr, self.parse_e()])
+            op = self.consumir('OU')
+            expr = No('binario ou', [expr, self.parse_e()], op.linha, op.coluna)
         return expr
 
     def parse_e(self):
         expr = self.parse_igualdade()
         while self.atual().tipo == 'E':
-            self.consumir('E')
-            expr = No('binario e', [expr, self.parse_igualdade()])
+            op = self.consumir('E')
+            expr = No('binario e', [expr, self.parse_igualdade()], op.linha, op.coluna)
         return expr
 
     def parse_igualdade(self):
         expr = self.parse_relacional()
         while self.atual().tipo in ('IGUAL', 'DIFERENTE'):
-            op = self.atual().tipo
-            self.consumir(op)
-            expr = No(f'binario {OPERADORES[op]}', [expr, self.parse_relacional()])
+            operador = self.atual()
+            self.consumir(operador.tipo)
+            expr = No(f'binario {OPERADORES[operador.tipo]}',
+                      [expr, self.parse_relacional()],
+                      operador.linha, operador.coluna)
         return expr
 
     def parse_relacional(self):
         expr = self.parse_soma()
         while self.atual().tipo in ('MENOR', 'MENOR_IGUAL', 'MAIOR', 'MAIOR_IGUAL'):
-            op = self.atual().tipo
-            self.consumir(op)
-            expr = No(f'binario {OPERADORES[op]}', [expr, self.parse_soma()])
+            operador = self.atual()
+            self.consumir(operador.tipo)
+            expr = No(f'binario {OPERADORES[operador.tipo]}',
+                      [expr, self.parse_soma()],
+                      operador.linha, operador.coluna)
         return expr
 
     def parse_soma(self):
         expr = self.parse_multiplicacao()
         while self.atual().tipo in ('MAIS', 'MENOS'):
-            op = self.atual().tipo
-            self.consumir(op)
-            expr = No(f'binario {OPERADORES[op]}', [expr, self.parse_multiplicacao()])
+            operador = self.atual()
+            self.consumir(operador.tipo)
+            expr = No(f'binario {OPERADORES[operador.tipo]}',
+                      [expr, self.parse_multiplicacao()],
+                      operador.linha, operador.coluna)
         return expr
 
     def parse_multiplicacao(self):
         expr = self.parse_unario()
         while self.atual().tipo in ('VEZES', 'DIVIDE', 'RESTO'):
-            op = self.atual().tipo
-            self.consumir(op)
-            expr = No(f'binario {OPERADORES[op]}', [expr, self.parse_unario()])
+            operador = self.atual()
+            self.consumir(operador.tipo)
+            expr = No(f'binario {OPERADORES[operador.tipo]}',
+                      [expr, self.parse_unario()],
+                      operador.linha, operador.coluna)
         return expr
 
     def parse_unario(self):
         if self.atual().tipo == 'NAO':
-            self.consumir('NAO')
-            return No('unario nao', [self.parse_unario()])
+            op = self.consumir('NAO')
+            return No('unario nao', [self.parse_unario()], op.linha, op.coluna)
         if self.atual().tipo == 'MENOS':
-            self.consumir('MENOS')
-            return No('unario -', [self.parse_unario()])
+            op = self.consumir('MENOS')
+            return No('unario -', [self.parse_unario()], op.linha, op.coluna)
         return self.parse_primario()
 
     def parse_primario(self):
@@ -293,14 +308,15 @@ class Parser:
             valor = tok.lexema
             if tok.tipo == 'REAL':
                 valor = format(float(valor), '.6f')
-            return No(f'literal {tipo} {valor}')
+            return No(f'literal {tipo} {valor}', linha=tok.linha, coluna=tok.coluna)
 
         if tok.tipo == 'ID':
-            nome = self.consumir('ID').lexema
+            inicio = self.consumir('ID')
+            nome = inicio.lexema
             if self.atual().tipo == 'ABRE_PAR':
                 args = self.parse_argumentos()
-                return No(f'chamada {nome}', args)
-            return No(f'variavel {nome}')
+                return No(f'chamada {nome}', args, inicio.linha, inicio.coluna)
+            return No(f'variavel {nome}', linha=inicio.linha, coluna=inicio.coluna)
 
         self.erro('esperado expressao', tok)
 
