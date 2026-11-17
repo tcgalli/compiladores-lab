@@ -232,3 +232,49 @@ A abertura dos escopos segue estas regras:
 - Cada bloco, incluindo os de `se`, `senao` e `enquanto`, abre um novo escopo.
 
 Essa organização produz a numeração e a relação entre escopos usadas em `--tabela`, e mantém a informação de pai necessária para relacionar nomes a posições de memória na E4.
+
+## Conjunto de instruções da VM da Entrega 4
+
+O `.mplb` é bytecode textual de pilha. Na notação abaixo, o topo da pilha fica
+à direita; `a` e `b` são valores e `v` é o resultado.
+
+| Instrução | Efeito na pilha |
+|---|---|
+| `funcao nome tipo` | Não altera a pilha; marca a entrada de uma função. |
+| `param nome tipo` | Não altera a pilha; associa um argumento ao parâmetro do frame atual. |
+| `local nome tipo` | Não altera a pilha; cria a variável local com o valor padrão do tipo. |
+| `scope_push` | Não altera a pilha; abre um escopo local no frame atual. |
+| `scope_pop` | Não altera a pilha; fecha o escopo local atual. |
+| `const valor` | `[...]` → `[..., valor]`; empilha um literal. |
+| `load nome` | `[...]` → `[..., valor]`; empilha o valor de uma variável local. |
+| `store nome` | `[..., valor]` → `[...]`; armazena o topo numa variável local. |
+| `to_real` | `[..., inteiro]` → `[..., real]`; converte o topo para real. |
+| `neg` | `[..., a]` → `[..., -a]`; nega o valor numérico do topo. |
+| `not` | `[..., a]` → `[..., nao a]`; nega o lógico do topo. |
+| `add` | `[..., a, b]` → `[..., a+b]`; soma ou concatena textos. |
+| `sub` | `[..., a, b]` → `[..., a-b]`; subtrai. |
+| `mul` | `[..., a, b]` → `[..., a*b]`; multiplica. |
+| `div` | `[..., a, b]` → `[..., a/b]`; divide, truncando em direção a zero quando ambos são inteiros. |
+| `mod` | `[..., a, b]` → `[..., a%b]`; calcula o resto com o sinal do dividendo. |
+| `eq` | `[..., a, b]` → `[..., a==b]`; compara igualdade. |
+| `ne` | `[..., a, b]` → `[..., a!=b]`; compara diferença. |
+| `lt` | `[..., a, b]` → `[..., a<b]`; compara menor que. |
+| `le` | `[..., a, b]` → `[..., a<=b]`; compara menor ou igual. |
+| `gt` | `[..., a, b]` → `[..., a>b]`; compara maior que. |
+| `ge` | `[..., a, b]` → `[..., a>=b]`; compara maior ou igual. |
+| `and` | `[..., a, b]` → `[..., a e b]`; combina dois lógicos já avaliados. |
+| `or` | `[..., a, b]` → `[..., a ou b]`; combina dois lógicos já avaliados. |
+| `print` | `[..., valor]` → `[...]`; imprime o topo seguido de quebra de linha. |
+| `descarta` | `[..., valor]` → `[...]`; descarta o topo. |
+| `jz rotulo` | `[..., logico]` → `[...]`; desvia se o topo for falso. |
+| `desvie rotulo` | Não altera a pilha; desvia incondicionalmente. |
+| `call nome n` | Retira os `n` argumentos e cria um frame; função não vazia empilha o retorno ao voltar. |
+| `retorne valor` | `[..., valor]` → `[...]`; retorna o valor ao chamador, que o empilha. |
+| `retorne` | Não altera a pilha; retorna sem valor ao chamador. |
+| `fim` | Não altera a pilha; encerra a função atual sem retorno explícito. |
+| `rotulo:` | Não altera a pilha; marca um destino de desvio. |
+| `.linha linha coluna` | Não altera a pilha; atualiza a posição usada em erros de execução. |
+
+Cada chamada possui seus próprios locais e escopos. A pilha de operandos é
+compartilhada entre frames; argumentos e valores de retorno são transferidos
+por ela.
